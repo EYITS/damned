@@ -54,7 +54,7 @@ export component MonitorWindow inherits Window {
     title: "damned.exe";
     background: #050505;
     default-font-family: "Segoe UI";
-    default-font-size: 14px * root.scale;
+    default-font-size: 16px * root.scale;
     preferred-width: 900px * root.scale;
     min-width: 780px * root.scale;
     preferred-height: root.content-height;
@@ -96,7 +96,6 @@ export component MonitorWindow inherits Window {
                 background: #090909;
                 HorizontalLayout {
                     padding-left: 12px; padding-right: 12px;
-                    alignment: start;
                     Rectangle {
                         width: 184px; height: 34px;
                         border-radius: 11px; border-width: 1px; border-color: #39323f;
@@ -145,7 +144,7 @@ export component MonitorWindow inherits Window {
                             text: heading + (root.sort-column == index ? (root.descending ? " ↓" : " ↑") : "");
                             color: #ece5f3; vertical-alignment: center;
                             horizontal-alignment: index == 0 ? left : right;
-                            font-size: 13px * root.scale;
+                            font-size: 14px * root.scale;
                         }
                         TouchArea { clicked => { root.sort(index); } }
                     }
@@ -158,6 +157,7 @@ export component MonitorWindow inherits Window {
                     Rectangle { y: parent.height - 1px; height: 1px; background: #171717; }
                     Rectangle {
                         Rectangle {
+                            x: 0px;
                             width: parent.width * 0.36;
                             Text {
                                 x: (row.child ? 24px : 8px) * root.scale;
@@ -179,7 +179,7 @@ export component MonitorWindow inherits Window {
                             Text {
                                 x: 3px; width: parent.width - 12px * root.scale;
                                 text: value; color: #f1edf6; font-family: "Consolas";
-                                font-size: 13px * root.scale;
+                                font-size: 15px * root.scale;
                                 vertical-alignment: center; horizontal-alignment: right;
                             }
                             TouchArea {
