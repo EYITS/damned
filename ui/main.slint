@@ -1,0 +1,201 @@
+import { ListView } from "std-widgets.slint";
+
+export struct ProcessRow {
+    key: string,
+    name: string,
+    cpu: string,
+    ram: string,
+    gpu: string,
+    network: string,
+    disk: string,
+    child: bool,
+    expandable: bool,
+    expanded: bool,
+}
+
+export struct ResourceCard {
+    label: string,
+    value: string,
+    detail: string,
+    explanation: string,
+    graph: image,
+}
+
+component ModeButton inherits Rectangle {
+    in property <int> dots;
+    in property <bool> selected;
+    callback activated;
+    forward-focus: focus;
+    accessible-role: button;
+    accessible-label: dots == 1 ? "Kaynak özetleri" : dots == 2 ? "İşlem listesi" : dots == 3 ? "Özetler ve liste" : "Grafikler, özetler ve liste";
+    accessible-action-default => { root.activated(); }
+    border-radius: 8px;
+    background: selected ? #3c304d : #131116;
+    border-width: selected || focus.has-focus ? 1px : 0px;
+    border-color: #9272ad;
+    for dot in dots: Rectangle {
+        width: 4px; height: 4px; border-radius: 2px;
+        x: dots == 1 ? (parent.width - self.width) / 2 : dots == 3 ? parent.width / 2 - 10px + dot * 8px : parent.width / 2 + (mod(dot, 2) == 0 ? -8px : 4px);
+        y: dots == 1 ? (parent.height - self.height) / 2 : dots == 3 ? parent.height / 2 - 10px + dot * 8px : dots == 2 ? parent.height / 2 + (dot == 0 ? -7px : 3px) : parent.height / 2 + (dot < 2 ? -7px : 3px);
+        background: selected ? #f0e5ff : #8c8791;
+    }
+    focus := FocusScope {
+        key-pressed(event) => {
+            if event.text == " " || event.text == Key.Return {
+                root.activated(); return accept;
+            }
+            return reject;
+        }
+    }
+    TouchArea { clicked => { focus.focus(); root.activated(); } }
+}
+
+export component MonitorWindow inherits Window {
+    title: "damned.exe";
+    background: #050505;
+    default-font-family: "Segoe UI";
+    default-font-size: 14px * root.scale;
+    preferred-width: 900px * root.scale;
+    min-width: 780px * root.scale;
+    preferred-height: root.content-height;
+    in property <length> content-height: 640px;
+    in property <float> scale: 0.9;
+    in property <int> mode: 3;
+    in property <int> sort-column: 1;
+    in property <bool> descending: true;
+    in property <[ProcessRow]> rows;
+    in property <[ResourceCard]> cards;
+    in property <[string]> headings;
+    in-out property <string> hint;
+    private property <bool> show-summary: mode != 1;
+    private property <bool> show-list: mode != 0;
+    private property <bool> show-graphs: mode == 0 || mode == 3;
+    callback choose-mode(int);
+    callback change-scale(int);
+    callback sort(int);
+    callback toggle(string);
+    forward-focus: keys;
+
+    keys := FocusScope {
+        key-pressed(event) => {
+            if event.text == "+" || event.text == "=" { root.change-scale(10); return accept; }
+            if event.text == "-" || event.text == "−" { root.change-scale(-10); return accept; }
+            if event.text == "0" { root.change-scale(0); return accept; }
+            if event.text == "1" { root.choose-mode(0); return accept; }
+            if event.text == "2" { root.choose-mode(1); return accept; }
+            if event.text == "3" { root.choose-mode(2); return accept; }
+            if event.text == "4" { root.choose-mode(3); return accept; }
+            if event.text == Key.LeftArrow { root.choose-mode(Math.max(0, root.mode - 1)); return accept; }
+            if event.text == Key.RightArrow { root.choose-mode(Math.min(3, root.mode + 1)); return accept; }
+            return reject;
+        }
+        VerticalLayout {
+            spacing: 0px;
+            Rectangle {
+                height: 46px * root.scale;
+                background: #090909;
+                HorizontalLayout {
+                    padding-left: 12px; padding-right: 12px;
+                    alignment: start;
+                    Rectangle {
+                        width: 184px; height: 34px;
+                        border-radius: 11px; border-width: 1px; border-color: #39323f;
+                        background: #131116;
+                        HorizontalLayout {
+                            padding: 3px; spacing: 3px;
+                            for index in 4: ModeButton {
+                                dots: index + 1;
+                                selected: root.mode == index;
+                                activated => { root.choose-mode(index); }
+                            }
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text { text: round(root.scale * 100) + "%"; color: #99939f; vertical-alignment: center; }
+                }
+            }
+            if root.show-summary: Rectangle {
+                height: (root.show-graphs ? 156px : 104px) * root.scale;
+                background: #090909;
+                HorizontalLayout {
+                    spacing: 1px;
+                    for card in root.cards: Rectangle {
+                        background: #090909;
+                        VerticalLayout {
+                            padding: 12px * root.scale; spacing: 3px * root.scale;
+                            Text { text: card.label; color: #939098; }
+                            Text { text: card.value; color: #f6f3f9; font-size: 24px * root.scale; }
+                            Text { text: card.detail; color: #b3adb9; font-size: 12px * root.scale; overflow: elide; }
+                            if root.show-graphs: Image { source: card.graph; height: 36px * root.scale; image-fit: fill; }
+                        }
+                        TouchArea { moved => { root.hint = card.explanation; } changed has-hover => { if !self.has-hover { root.hint = ""; } } }
+                    }
+                }
+            }
+            if root.show-list: Rectangle {
+                height: 52px * root.scale;
+                background: #090909;
+                Rectangle {
+                    for heading[index] in root.headings: Rectangle {
+                        x: index == 0 ? 0px : parent.width * (0.36 + (index - 1) * 0.128);
+                        width: index == 0 ? parent.width * 0.36 : parent.width * 0.128;
+                        background: root.sort-column == index ? #2c1048 : #090909;
+                        Text {
+                            x: 10px * root.scale; width: parent.width - 20px * root.scale;
+                            text: heading + (root.sort-column == index ? (root.descending ? " ↓" : " ↑") : "");
+                            color: #ece5f3; vertical-alignment: center;
+                            horizontal-alignment: index == 0 ? left : right;
+                            font-size: 13px * root.scale;
+                        }
+                        TouchArea { clicked => { root.sort(index); } }
+                    }
+                }
+            }
+            if root.show-list: ListView {
+                for row in root.rows: Rectangle {
+                    height: 48px * root.scale;
+                    background: #030303;
+                    Rectangle { y: parent.height - 1px; height: 1px; background: #171717; }
+                    Rectangle {
+                        Rectangle {
+                            width: parent.width * 0.36;
+                            Text {
+                                x: (row.child ? 24px : 8px) * root.scale;
+                                width: parent.width - self.x - 5px;
+                                text: (row.expandable ? (row.expanded ? "▾ " : "▸ ") : "") + row.name;
+                                color: row.child ? #b3acbc : #f1edf6;
+                                vertical-alignment: center; overflow: elide;
+                            }
+                            TouchArea {
+                                clicked => { if row.expandable { root.toggle(row.key); } }
+                                moved => { root.hint = row.name; }
+                                changed has-hover => { if !self.has-hover { root.hint = ""; } }
+                            }
+                        }
+                        for value[index] in [row.cpu, row.ram, row.gpu, row.network, row.disk]: Rectangle {
+                            x: parent.width * (0.36 + index * 0.128);
+                            width: parent.width * 0.128;
+                            background: root.sort-column == index + 1 ? #2c1048 : #030303;
+                            Text {
+                                x: 3px; width: parent.width - 12px * root.scale;
+                                text: value; color: #f1edf6; font-family: "Consolas";
+                                font-size: 13px * root.scale;
+                                vertical-alignment: center; horizontal-alignment: right;
+                            }
+                            TouchArea {
+                                moved => { root.hint = index == 3 ? "İşlem başına ağ: ETW oturumu uygulanmadı; veri yok." : index == 4 ? "İşlem başına disk: GetProcessIoCounters ağ/cihaz I/O içerir; disk diye gösterilmez." : index == 2 ? "GPU: sürücü ve Windows GPU Engine sayacı gerekir; — kullanılabilir örnek yok demektir." : "CPU: toplam işlemci kapasitesi. RAM: çalışma kümesi; paylaşılan sayfalar toplamda birden çok sayılabilir."; }
+                                changed has-hover => { if !self.has-hover { root.hint = ""; } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if root.hint != "": Rectangle {
+        x: 6px; y: root.height - self.height - 5px;
+        width: root.width - 12px; height: 38px * root.scale;
+        background: #242027; border-color: #564362; border-width: 1px;
+        Text { x: 8px; width: parent.width - 16px; text: root.hint; color: #eee5f4; font-size: 12px * root.scale; vertical-alignment: center; wrap: word-wrap; }
+    }
+}
